@@ -31,11 +31,39 @@ public class CertSignerLauncher implements Callable<Integer> {
 
     @Option(
         names = {"-r", "--cert-csr-path"},
-        required = true,
         paramLabel = "<path>",
         description = "Path to the certificate signing request (CSR) file."
     )
     private String certCsrPath;
+
+    @Option(
+        names = {"-s", "--cert-subject-dn"},
+        paramLabel = "<dn>",
+        description = "Certificate Subject Distinguished Name (e.g. 'CN=example.com,O=Org,C=US')."
+    )
+    private String certSubjectDn;
+
+    @Option(
+        names = {"-p", "--cert-public-key-path"},
+        paramLabel = "<path>",
+        description = "Path to the subject public key file."
+    )
+    private String certPublicKeyPath;
+
+    @Option(
+        names = {"-a", "--cert-attributes"},
+        paramLabel = "<attributes>",
+        description = "Certificate attributes (path to ASN.1 DER file or Base64 encoded ASN.1)."
+    )
+    private String certAttributes;
+
+    @Option(
+        names = {"-d", "--validity-days", "--validity-period"},
+        paramLabel = "<days>",
+        defaultValue = "365",
+        description = "Certificate validity period in days (default: 365)."
+    )
+    private Integer validityDays = 365;
 
     @Option(
         names = {"-v", "--kv-name"},
@@ -67,10 +95,16 @@ public class CertSignerLauncher implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        validateInputs();
+
         var certSigner = new CertSigner(
             new CertSignerConfig(
                 outputCertPath, 
-                certCsrPath, 
+                certCsrPath,
+                certSubjectDn,
+                certPublicKeyPath,
+                certAttributes,
+                validityDays,
                 kvName, 
                 kvKeyName, 
                 kvKeyVersion
@@ -79,9 +113,31 @@ public class CertSignerLauncher implements Callable<Integer> {
 
         byte[] signedCert = certSigner.signCert();
 
-        Files.write(Path.of(outputCertPath), signedCert);
+        if (signedCert != null) {
+            Files.write(Path.of(outputCertPath), signedCert);
+        }
 
         return CommandLine.ExitCode.OK;
+    }
+
+    private void validateInputs() {
+        boolean hasCsr = certCsrPath != null && !certCsrPath.isBlank();
+        boolean hasDirectSubject = certSubjectDn != null && !certSubjectDn.isBlank();
+        boolean hasPublicKey = certPublicKeyPath != null && !certPublicKeyPath.isBlank();
+
+        if (!hasCsr && !hasDirectSubject) {
+            throw new CommandLine.ParameterException(
+                new CommandLine(this),
+                "Either --cert-csr-path (-r) or --cert-subject-dn (-s) with --cert-public-key-path (-p) must be provided."
+            );
+        }
+
+        if (hasDirectSubject && !hasPublicKey) {
+            throw new CommandLine.ParameterException(
+                new CommandLine(this),
+                "When --cert-subject-dn (-s) is provided, --cert-public-key-path (-p) must also be specified."
+            );
+        }
     }
 
     public static void main(String[] args) {
@@ -95,6 +151,22 @@ public class CertSignerLauncher implements Callable<Integer> {
 
     public String getCertCsrPath() {
         return certCsrPath;
+    }
+
+    public String getCertSubjectDn() {
+        return certSubjectDn;
+    }
+
+    public String getCertPublicKeyPath() {
+        return certPublicKeyPath;
+    }
+
+    public String getCertAttributes() {
+        return certAttributes;
+    }
+
+    public Integer getValidityDays() {
+        return validityDays;
     }
 
     public String getKvName() {

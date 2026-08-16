@@ -27,6 +27,7 @@
         <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
         <picocli.version>4.7.6</picocli.version>
         <bcprov-jdk18on.version>1.85.2</bcprov-jdk18on.version>
+        <bcpkix-jdk18on.version>1.85</bcpkix-jdk18on.version>
     </properties>
 
     <dependencies>
@@ -45,6 +46,12 @@
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
             <version>${bcprov-jdk18on.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>${bcpkix-jdk18on.version}</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
