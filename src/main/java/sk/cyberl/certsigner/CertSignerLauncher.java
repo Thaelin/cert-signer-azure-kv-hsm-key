@@ -3,8 +3,14 @@ package sk.cyberl.certsigner;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import sk.cyberl.certsigner.config.CertSignerConfig;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.Security;
 import java.util.concurrent.Callable;
+
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 @Command(
     name = "cert-signer",
@@ -16,12 +22,12 @@ import java.util.concurrent.Callable;
 public class CertSignerLauncher implements Callable<Integer> {
 
     @Option(
-        names = {"-c", "--signing-cert-path"},
+        names = {"-o", "--output-cert-path"},
         required = true,
         paramLabel = "<path>",
-        description = "Path to the signing certificate file."
+        description = "Path to the output certificate file."
     )
-    private String signingCertPath;
+    private String outputCertPath;
 
     @Option(
         names = {"-r", "--cert-csr-path"},
@@ -55,9 +61,26 @@ public class CertSignerLauncher implements Callable<Integer> {
     )
     private String kvKeyVersion;
 
+    static {
+        Security.addProvider(new BouncyCastleProvider());
+    }
+
     @Override
     public Integer call() throws Exception {
-        // Business logic will be executed here
+        var certSigner = new CertSigner(
+            new CertSignerConfig(
+                outputCertPath, 
+                certCsrPath, 
+                kvName, 
+                kvKeyName, 
+                kvKeyVersion
+            )
+        );
+
+        byte[] signedCert = certSigner.signCert();
+
+        Files.write(Path.of(outputCertPath), signedCert);
+
         return CommandLine.ExitCode.OK;
     }
 
@@ -66,8 +89,8 @@ public class CertSignerLauncher implements Callable<Integer> {
         System.exit(exitCode);
     }
 
-    public String getSigningCertPath() {
-        return signingCertPath;
+    public String getOutputCertPath() {
+        return outputCertPath;
     }
 
     public String getCertCsrPath() {
