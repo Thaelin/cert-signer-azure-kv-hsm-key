@@ -33,4 +33,4 @@ jobs:
           name: Release ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            target/cert-signer-azure-kv-hsm-key*.jar
+            target/cert-signer-azure-kv-hsm-key.jar

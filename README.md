@@ -31,7 +31,7 @@ mvn clean package
 ```
 
 The resulting executable JAR will be generated in the `target/` directory:
-`target/cert-signer-azure-kv-hsm-key-1.0.0-SNAPSHOT.jar`
+`target/cert-signer-azure-kv-hsm-key.jar`
 
 ---
 
@@ -40,7 +40,7 @@ The resulting executable JAR will be generated in the `target/` directory:
 Run the JAR using the `java -jar` command:
 
 ```bash
-java -jar target/cert-signer-azure-kv-hsm-key-1.0.0-SNAPSHOT.jar [OPTIONS]
+java -jar target/cert-signer-azure-kv-hsm-key.jar [OPTIONS]
 ```
 
 ### Examples
@@ -48,7 +48,7 @@ java -jar target/cert-signer-azure-kv-hsm-key-1.0.0-SNAPSHOT.jar [OPTIONS]
 #### 1. Sign using a CSR (PEM output)
 
 ```bash
-java -jar target/cert-signer-azure-kv-hsm-key-1.0.0-SNAPSHOT.jar \
+java -jar target/cert-signer-azure-kv-hsm-key.jar \
   --output-cert-path cert.pem \
   --cert-csr-path request.csr \
   --validity-days 365 \
@@ -60,7 +60,7 @@ java -jar target/cert-signer-azure-kv-hsm-key-1.0.0-SNAPSHOT.jar \
 #### 2. Sign using Subject DN and Public Key (DER output)
 
 ```bash
-java -jar target/cert-signer-azure-kv-hsm-key-1.0.0-SNAPSHOT.jar \
+java -jar target/cert-signer-azure-kv-hsm-key.jar \
   -o cert.der \
   -s "CN=example.com,O=My Org,C=US" \
   -p public_key.pem \
@@ -73,7 +73,7 @@ java -jar target/cert-signer-azure-kv-hsm-key-1.0.0-SNAPSHOT.jar \
 #### 3. Sign with ASN.1 DER Attributes / Extensions
 
 ```bash
-java -jar target/cert-signer-azure-kv-hsm-key-1.0.0-SNAPSHOT.jar \
+java -jar target/cert-signer-azure-kv-hsm-key.jar \
   --output-cert-path cert.pem \
   --cert-subject-dn "CN=example.com,O=My Org,C=US" \
   --cert-public-key-path public_key.pem \
