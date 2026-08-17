@@ -8,8 +8,14 @@ import picocli.CommandLine.UnmatchedArgumentException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Unit tests for {@link CertSignerLauncher} command-line argument parsing and validation.
+ */
 class CertSignerLauncherTest {
 
+    /**
+     * Tests parsing valid command-line arguments when a CSR file is specified.
+     */
     @Test
     void testParseValidArgumentsWithCsr() {
         String[] args = {
@@ -32,6 +38,9 @@ class CertSignerLauncherTest {
         assertEquals(365, certSigner.getValidityDays());
     }
 
+    /**
+     * Tests parsing valid command-line arguments when specifying direct Subject DN and public key path.
+     */
     @Test
     void testParseValidArgumentsWithSubjectDnAndPublicKey() {
         String[] args = {
@@ -59,6 +68,9 @@ class CertSignerLauncherTest {
         assertEquals("v1", certSigner.getKvKeyVersion());
     }
 
+    /**
+     * Tests parsing command-line arguments using the {@code --option=value} syntax.
+     */
     @Test
     void testParseWithEqualsSyntax() {
         String[] args = {
@@ -82,6 +94,9 @@ class CertSignerLauncherTest {
         assertEquals("v1", certSigner.getKvKeyVersion());
     }
 
+    /**
+     * Tests parsing command-line arguments using short options (e.g. {@code -o}, {@code -s}, {@code -p}).
+     */
     @Test
     void testParseWithShortOptions() {
         String[] args = {
@@ -109,6 +124,9 @@ class CertSignerLauncherTest {
         assertEquals("v1", certSigner.getKvKeyVersion());
     }
 
+    /**
+     * Tests that missing required options (such as Key Vault details) triggers a {@link MissingParameterException}.
+     */
     @Test
     void testMissingRequiredOptionThrowsException() {
         String[] args = {
@@ -121,6 +139,9 @@ class CertSignerLauncherTest {
         assertThrows(MissingParameterException.class, () -> cmd.parseArgs(args));
     }
 
+    /**
+     * Tests that unknown CLI arguments trigger an {@link UnmatchedArgumentException}.
+     */
     @Test
     void testUnknownOptionThrowsException() {
         String[] args = {
@@ -137,6 +158,9 @@ class CertSignerLauncherTest {
         assertThrows(UnmatchedArgumentException.class, () -> cmd.parseArgs(args));
     }
 
+    /**
+     * Tests that running the launcher without either CSR or Subject DN triggers a {@link ParameterException}.
+     */
     @Test
     void testCallWithoutCsrOrSubjectThrowsException() {
         String[] args = {
@@ -153,6 +177,9 @@ class CertSignerLauncherTest {
         assertThrows(ParameterException.class, launcher::call);
     }
 
+    /**
+     * Tests that providing Subject DN without public key triggers a {@link ParameterException}.
+     */
     @Test
     void testCallWithSubjectDnWithoutPublicKeyThrowsException() {
         String[] args = {

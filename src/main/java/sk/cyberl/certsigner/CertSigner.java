@@ -45,20 +45,48 @@ import sk.cyberl.certsigner.azure.DefaultKeyVaultSignerProvider;
 import sk.cyberl.certsigner.azure.KeyVaultSignerProvider;
 import sk.cyberl.certsigner.config.CertSignerConfig;
 
+/**
+ * Certificate signer service that constructs X.509 v3 certificates and signs them
+ * using cryptographic keys stored in Azure Key Vault (HSM).
+ * <p>
+ * Supports input from either a PKCS#10 Certificate Signing Request (CSR) or direct
+ * Subject DN, Public Key, and optional ASN.1 certificate attributes/extensions.
+ * Outputs certificates in either PEM or DER encoding.
+ */
 public class CertSigner {
 
     private final CertSignerConfig config;
     private final KeyVaultSignerProvider signerProvider;
 
+    /**
+     * Constructs a {@code CertSigner} with the given configuration and a {@link DefaultKeyVaultSignerProvider}.
+     *
+     * @param config The certificate signing configuration.
+     * @throws NullPointerException if {@code config} is null.
+     */
     public CertSigner(CertSignerConfig config) {
         this(config, new DefaultKeyVaultSignerProvider());
     }
 
+    /**
+     * Constructs a {@code CertSigner} with the given configuration and signer provider.
+     *
+     * @param config         The certificate signing configuration.
+     * @param signerProvider The provider used to create the Key Vault {@link ContentSigner}.
+     * @throws NullPointerException if {@code config} or {@code signerProvider} is null.
+     */
     public CertSigner(CertSignerConfig config, KeyVaultSignerProvider signerProvider) {
         this.config = Objects.requireNonNull(config, "config must not be null");
         this.signerProvider = Objects.requireNonNull(signerProvider, "signerProvider must not be null");
     }
 
+    /**
+     * Constructs and signs an X.509 certificate using Azure Key Vault HSM keys according to the configuration.
+     *
+     * @return Byte array containing the encoded certificate in PEM or DER format.
+     * @throws IllegalArgumentException if neither CSR nor Subject DN is configured.
+     * @throws RuntimeException         if reading CSR/keys, signing, or encoding the certificate fails.
+     */
     public byte[] signCert() {
         X500Name subjectDn;
         ASN1Set attributes;
@@ -104,6 +132,14 @@ public class CertSigner {
         }
     }
 
+    /**
+     * Creates and initializes an {@link X509v3CertificateBuilder} with subject, validity period, public key, and extensions.
+     *
+     * @param subjectDn            The subject Distinguished Name.
+     * @param subjectPublicKeyInfo The subject's public key info.
+     * @param attributes           Optional ASN.1 set containing certificate attributes/extensions.
+     * @return A configured {@link X509v3CertificateBuilder}.
+     */
     private X509v3CertificateBuilder createCertificateBuilder(
             X500Name subjectDn,
             SubjectPublicKeyInfo subjectPublicKeyInfo,
@@ -129,6 +165,13 @@ public class CertSigner {
         return certBuilder;
     }
 
+    /**
+     * Extracts and adds extensions from the provided ASN.1 attributes set to the certificate builder.
+     *
+     * @param certBuilder The certificate builder to add extensions to.
+     * @param attributes  ASN.1 set containing extensions or extension requests.
+     * @throws RuntimeException if adding an extension to the certificate builder fails.
+     */
     private void addExtensions(X509v3CertificateBuilder certBuilder, ASN1Set attributes) {
         if (attributes == null) {
             return;
@@ -163,6 +206,12 @@ public class CertSigner {
         }
     }
 
+    /**
+     * Reads and parses the PKCS#10 Certificate Signing Request (CSR) from the configured file path.
+     *
+     * @return The parsed {@link CertificationRequestInfo}.
+     * @throws RuntimeException if reading or parsing the CSR file fails.
+     */
     private CertificationRequestInfo parseCsr() {
         try {
             byte[] csrBytes = Files.readAllBytes(Path.of(config.certCsrPath()));
@@ -184,6 +233,12 @@ public class CertSigner {
         }
     }
 
+    /**
+     * Parses certificate attributes from the configured DER file path or Base64-encoded string.
+     *
+     * @return The parsed {@link ASN1Set}, or {@code null} if no attributes are configured.
+     * @throws RuntimeException if parsing the attributes fails.
+     */
     private ASN1Set parseAttributes() {
         if (config.certAttributes() == null || config.certAttributes().isBlank()) {
             return null;
@@ -214,6 +269,12 @@ public class CertSigner {
         }
     }
 
+    /**
+     * Reads and parses the subject's public key from the configured file path.
+     *
+     * @return The parsed {@link SubjectPublicKeyInfo}, or {@code null} if no public key path is configured.
+     * @throws RuntimeException if reading or parsing the public key file fails.
+     */
     private SubjectPublicKeyInfo parsePublicKey() {
         if (config.certPublicKeyPath() == null || config.certPublicKeyPath().isBlank()) {
             return null;
@@ -236,6 +297,12 @@ public class CertSigner {
         }
     }
 
+    /**
+     * Parses a Distinguished Name string into an {@link X500Name}.
+     *
+     * @param dn Distinguished Name string (e.g. "CN=example.com,O=Org,C=US").
+     * @return The parsed {@link X500Name}.
+     */
     private X500Name parseSubjectDn(String dn) {
         try {
             return X500Name.getInstance(new X500Principal(dn).getEncoded());

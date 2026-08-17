@@ -30,13 +30,25 @@ import javax.security.auth.x500.X500Principal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Unit tests for {@link CertSigner} certificate generation, signing, and format encoding.
+ */
 class CertSignerTest {
 
+    /**
+     * Initializes the Bouncy Castle security provider before all tests.
+     */
     @BeforeAll
     static void setUp() {
         Security.addProvider(new BouncyCastleProvider());
     }
 
+    /**
+     * Tests certificate generation and signing using direct Subject DN and public key file.
+     *
+     * @param tempDir Temporary directory for test files.
+     * @throws Exception if key generation, signing, or verification fails.
+     */
     @Test
     void testDirectSubjectAndPublicKeyParsingAndSigning(@TempDir Path tempDir) throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
@@ -86,6 +98,12 @@ class CertSignerTest {
         assertDoesNotThrow(() -> cert.verify(keyPair.getPublic()));
     }
 
+    /**
+     * Tests certificate generation and signing from a PKCS#10 Certificate Signing Request (CSR).
+     *
+     * @param tempDir Temporary directory for test files.
+     * @throws Exception if CSR creation, signing, or verification fails.
+     */
     @Test
     void testCsrParsingAndCertConstruction(@TempDir Path tempDir) throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
@@ -136,6 +154,12 @@ class CertSignerTest {
         assertDoesNotThrow(() -> cert.verify(keyPair.getPublic()));
     }
 
+    /**
+     * Tests certificate signing using an Elliptic Curve (ECDSA) key.
+     *
+     * @param tempDir Temporary directory for test files.
+     * @throws Exception if EC key generation, signing, or verification fails.
+     */
     @Test
     void testEcKeyCertSigning(@TempDir Path tempDir) throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC", "BC");
@@ -175,6 +199,12 @@ class CertSignerTest {
         assertDoesNotThrow(() -> cert.verify(ecKeyPair.getPublic()));
     }
 
+    /**
+     * Tests certificate output encoding in DER binary format when filename ends with {@code .der}.
+     *
+     * @param tempDir Temporary directory for test files.
+     * @throws Exception if key generation or DER decoding fails.
+     */
     @Test
     void testDerOutputFormat(@TempDir Path tempDir) throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
@@ -213,6 +243,9 @@ class CertSignerTest {
         assertEquals("CN=der-test,O=CyberL,C=SK", cert.getSubjectX500Principal().getName());
     }
 
+    /**
+     * Tests that an {@link IllegalArgumentException} is thrown when both CSR and Subject DN are missing.
+     */
     @Test
     void testMissingBothCsrAndSubjectThrows() {
         CertSignerConfig config = new CertSignerConfig(

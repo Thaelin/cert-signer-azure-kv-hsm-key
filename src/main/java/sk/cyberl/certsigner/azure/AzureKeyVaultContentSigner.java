@@ -28,6 +28,14 @@ public class AzureKeyVaultContentSigner implements ContentSigner {
     private final boolean isEc;
     private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
+    /**
+     * Constructs a new {@code AzureKeyVaultContentSigner}.
+     *
+     * @param cryptographyClient  The Key Vault cryptography client used to perform remote signing operations.
+     * @param signatureAlgorithm  The Key Vault signature algorithm.
+     * @param algorithmIdentifier The ASN.1 algorithm identifier representing the signature scheme.
+     * @param isEc                {@code true} if the key is elliptic curve (ECDSA), {@code false} if RSA.
+     */
     public AzureKeyVaultContentSigner(
             CryptographyClient cryptographyClient,
             SignatureAlgorithm signatureAlgorithm,
@@ -39,16 +47,33 @@ public class AzureKeyVaultContentSigner implements ContentSigner {
         this.isEc = isEc;
     }
 
+    /**
+     * Returns the ASN.1 algorithm identifier for this signature algorithm.
+     *
+     * @return The {@link AlgorithmIdentifier}.
+     */
     @Override
     public AlgorithmIdentifier getAlgorithmIdentifier() {
         return algorithmIdentifier;
     }
 
+    /**
+     * Returns the output stream into which data to be signed is written.
+     *
+     * @return The {@link OutputStream} collecting data to sign.
+     */
     @Override
     public OutputStream getOutputStream() {
         return outputStream;
     }
 
+    /**
+     * Calculates the signature over the collected data using Azure Key Vault.
+     * For EC keys, the raw IEEE P1363 signature is converted to ASN.1 DER format.
+     *
+     * @return The certificate signature bytes.
+     * @throws RuntimeException if signing via Azure Key Vault fails or signature conversion fails.
+     */
     @Override
     public byte[] getSignature() {
         try {
@@ -70,8 +95,10 @@ public class AzureKeyVaultContentSigner implements ContentSigner {
      * Azure Key Vault returns ECDSA signatures in IEEE P1363 format, whereas X.509 certificates
      * (RFC 5280) require ASN.1 DER encoding.
      *
-     * @param p1363Signature Raw (r || s) signature bytes
-     * @return DER-encoded ASN.1 sequence containing r and s integers
+     * @param p1363Signature Raw (r || s) signature bytes.
+     * @return DER-encoded ASN.1 sequence containing r and s integers.
+     * @throws IllegalArgumentException if the signature is null, empty, or has an odd byte length.
+     * @throws RuntimeException if DER encoding fails.
      */
     public static byte[] convertP1363ToDer(byte[] p1363Signature) {
         if (p1363Signature == null || p1363Signature.length % 2 != 0 || p1363Signature.length == 0) {
@@ -97,10 +124,20 @@ public class AzureKeyVaultContentSigner implements ContentSigner {
         }
     }
 
+    /**
+     * Returns the Azure Key Vault signature algorithm used by this signer.
+     *
+     * @return The {@link SignatureAlgorithm}.
+     */
     public SignatureAlgorithm getSignatureAlgorithm() {
         return signatureAlgorithm;
     }
 
+    /**
+     * Indicates whether this signer uses an Elliptic Curve (EC) key.
+     *
+     * @return {@code true} if using an EC key; {@code false} if using RSA.
+     */
     public boolean isEc() {
         return isEc;
     }

@@ -12,6 +12,9 @@ import java.util.concurrent.Callable;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
+/**
+ * Command-line interface launcher for signing certificates using Azure Key Vault HSM keys.
+ */
 @Command(
     name = "cert-signer",
     mixinStandardHelpOptions = true,
@@ -93,6 +96,18 @@ public class CertSignerLauncher implements Callable<Integer> {
         Security.addProvider(new BouncyCastleProvider());
     }
 
+    /**
+     * Default constructor for {@code CertSignerLauncher}.
+     */
+    public CertSignerLauncher() {
+    }
+
+    /**
+     * Executes the certificate signing process from the parsed command-line arguments.
+     *
+     * @return Process exit code (0 for success).
+     * @throws Exception if validation fails or certificate signing encounters an error.
+     */
     @Override
     public Integer call() throws Exception {
         validateInputs();
@@ -120,6 +135,11 @@ public class CertSignerLauncher implements Callable<Integer> {
         return CommandLine.ExitCode.OK;
     }
 
+    /**
+     * Validates that required mutually dependent or alternative CLI options are present.
+     *
+     * @throws CommandLine.ParameterException if required option combinations are missing.
+     */
     private void validateInputs() {
         boolean hasCsr = certCsrPath != null && !certCsrPath.isBlank();
         boolean hasDirectSubject = certSubjectDn != null && !certSubjectDn.isBlank();
@@ -140,43 +160,93 @@ public class CertSignerLauncher implements Callable<Integer> {
         }
     }
 
+    /**
+     * Main entry point for the command-line application.
+     *
+     * @param args Command-line arguments.
+     */
     public static void main(String[] args) {
         int exitCode = new CommandLine(new CertSignerLauncher()).execute(args);
         System.exit(exitCode);
     }
 
+    /**
+     * Returns the output certificate path.
+     *
+     * @return Output certificate path.
+     */
     public String getOutputCertPath() {
         return outputCertPath;
     }
 
+    /**
+     * Returns the CSR file path.
+     *
+     * @return CSR file path.
+     */
     public String getCertCsrPath() {
         return certCsrPath;
     }
 
+    /**
+     * Returns the certificate Subject Distinguished Name.
+     *
+     * @return Subject DN string.
+     */
     public String getCertSubjectDn() {
         return certSubjectDn;
     }
 
+    /**
+     * Returns the public key file path.
+     *
+     * @return Public key file path.
+     */
     public String getCertPublicKeyPath() {
         return certPublicKeyPath;
     }
 
+    /**
+     * Returns the certificate attributes file path or Base64 string.
+     *
+     * @return Certificate attributes.
+     */
     public String getCertAttributes() {
         return certAttributes;
     }
 
+    /**
+     * Returns the certificate validity period in days.
+     *
+     * @return Validity period in days.
+     */
     public Integer getValidityDays() {
         return validityDays;
     }
 
+    /**
+     * Returns the Azure Key Vault name.
+     *
+     * @return Key Vault name.
+     */
     public String getKvName() {
         return kvName;
     }
 
+    /**
+     * Returns the Azure Key Vault key name.
+     *
+     * @return Key Vault key name.
+     */
     public String getKvKeyName() {
         return kvKeyName;
     }
 
+    /**
+     * Returns the Azure Key Vault key version.
+     *
+     * @return Key Vault key version.
+     */
     public String getKvKeyVersion() {
         return kvKeyVersion;
     }

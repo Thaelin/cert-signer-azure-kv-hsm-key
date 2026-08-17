@@ -13,8 +13,16 @@ import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Unit tests for {@link AzureKeyVaultContentSigner} signature conversion and algorithm resolution.
+ */
 class AzureKeyVaultContentSignerTest {
 
+    /**
+     * Tests converting 64-byte IEEE P1363 ECDSA signature (P-256 / SHA-256) to ASN.1 DER SEQUENCE.
+     *
+     * @throws Exception if ASN.1 decoding fails.
+     */
     @Test
     void testConvertP1363ToDerWithP256() throws Exception {
         // 64-byte P1363 signature for ES256 (32 bytes r, 32 bytes s)
@@ -40,6 +48,11 @@ class AzureKeyVaultContentSignerTest {
         }
     }
 
+    /**
+     * Tests converting 96-byte IEEE P1363 ECDSA signature (P-384 / SHA-384) to ASN.1 DER SEQUENCE.
+     *
+     * @throws Exception if ASN.1 decoding fails.
+     */
     @Test
     void testConvertP1363ToDerWithP384() throws Exception {
         // 96-byte P1363 signature for ES384 (48 bytes r, 48 bytes s)
@@ -64,6 +77,9 @@ class AzureKeyVaultContentSignerTest {
         }
     }
 
+    /**
+     * Tests that passing null, empty, or odd-length byte arrays throws {@link IllegalArgumentException}.
+     */
     @Test
     void testConvertP1363ToDerInvalidLengthThrows() {
         assertThrows(IllegalArgumentException.class, () -> AzureKeyVaultContentSigner.convertP1363ToDer(null));
@@ -71,6 +87,9 @@ class AzureKeyVaultContentSignerTest {
         assertThrows(IllegalArgumentException.class, () -> AzureKeyVaultContentSigner.convertP1363ToDer(new byte[7]));
     }
 
+    /**
+     * Tests lookup of Bouncy Castle {@link AlgorithmIdentifier} for RSA and ECDSA signature algorithms.
+     */
     @Test
     void testAlgorithmIdentifierFinder() {
         AlgorithmIdentifier rsaAlg = new DefaultSignatureAlgorithmIdentifierFinder().find("SHA256withRSA");

@@ -22,14 +22,33 @@ public class DefaultKeyVaultSignerProvider implements KeyVaultSignerProvider {
 
     private final TokenCredential credential;
 
+    /**
+     * Constructs a new {@code DefaultKeyVaultSignerProvider} using default Azure authentication credentials.
+     */
     public DefaultKeyVaultSignerProvider() {
         this(new DefaultAzureCredentialBuilder().build());
     }
 
+    /**
+     * Constructs a new {@code DefaultKeyVaultSignerProvider} with a custom {@link TokenCredential}.
+     *
+     * @param credential The Azure token credential to use for authentication.
+     */
     public DefaultKeyVaultSignerProvider(TokenCredential credential) {
         this.credential = credential;
     }
 
+    /**
+     * Creates a {@link ContentSigner} for the specified Azure Key Vault key by retrieving
+     * the key metadata, determining the appropriate signature algorithm, and initializing
+     * a cryptography client.
+     *
+     * @param kvName       Key Vault name or full vault URL.
+     * @param kvKeyName    Name of the key stored in Azure Key Vault.
+     * @param kvKeyVersion Optional version of the key. If null or blank, the latest version is used.
+     * @return A configured {@link ContentSigner} backed by Azure Key Vault.
+     * @throws IllegalStateException if the key cannot be found in Azure Key Vault.
+     */
     @Override
     public ContentSigner createContentSigner(String kvName, String kvKeyName, String kvKeyVersion) {
         String vaultUrl = formatVaultUrl(kvName);
@@ -86,6 +105,12 @@ public class DefaultKeyVaultSignerProvider implements KeyVaultSignerProvider {
         return new AzureKeyVaultContentSigner(cryptoClient, signatureAlgorithm, algorithmIdentifier, isEc);
     }
 
+    /**
+     * Normalizes and formats the Azure Key Vault URL.
+     *
+     * @param kvName Vault name or URL.
+     * @return Fully qualified Key Vault HTTPS URL.
+     */
     private String formatVaultUrl(String kvName) {
         if (kvName.startsWith("https://") || kvName.startsWith("http://")) {
             return kvName;
