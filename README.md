@@ -89,6 +89,70 @@ java -jar cert-signer-azure-kv-hsm-key.jar \
 
 ---
 
+## 🖥️ Sample Run & Output
+
+Below is an example of what executing `cert-signer` looks like in the terminal, demonstrating the certificate construction, Azure Key Vault HSM signing workflow, and the comprehensive provenance report:
+
+```bash
+$ java -jar cert-signer-azure-kv-hsm-key.jar \
+    -o cert.pem \
+    -r request.csr \
+    -d 365 \
+    -v my-keyvault \
+    -k my-ca-key \
+    -e 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
+```
+
+**Console Output:**
+
+```text
+14:23:45.102 [main] INFO  s.c.c.CertSignerLauncher - Starting cert-signer execution
+14:23:45.215 [main] INFO  s.c.certsigner.CertSigner - Initializing certificate construction and signing workflow
+14:23:45.220 [main] INFO  s.c.certsigner.CertSigner - Reading CSR from: request.csr
+14:23:45.310 [main] INFO  s.c.certsigner.CertSigner - Requesting remote ContentSigner from Key Vault: my-keyvault / my-ca-key
+14:23:45.312 [main] INFO  s.c.c.l.CertificateAttributeLogger - 
+================================================================================
+                    CERTIFICATE ATTRIBUTES & PROVENANCE
+================================================================================
+[CSR]      Subject DN:            CN=example.com,O=My Org,C=US
+[CSR]      Public Key:            RSA 2048-bit (Exponent: 65537)
+[DEFAULT]  Serial Number:         1786996359320 (0x1A011488098)
+[DEFAULT]  Issuer DN:             CN=example.com,O=My Org,C=US
+[DEFAULT]  Validity Not Before:   2026-08-17 19:52:39 UTC
+[CLI]      Validity Not After:    2027-08-17 19:52:39 UTC (365 days)
+[CLI]      Signing Key:           Vault: 'my-keyvault', Key: 'my-ca-key', Version: '7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d'
+[CLI]      Output Path:           cert.pem
+[KEY_VAULT]Signature Alg:         SHA256withRSA
+
+--------------------------------------------------------------------------------
+CERTIFICATE EXTENSIONS (2)
+--------------------------------------------------------------------------------
+1. [CSR] Basic Constraints (2.5.29.19)
+   Critical: TRUE
+   Value:    CA: FALSE
+
+2. [CSR] Subject Alternative Name (2.5.29.17)
+   Critical: FALSE
+   Value:    DNS:example.com, DNS:www.example.com
+
+================================================================================
+14:23:45.315 [main] INFO  s.c.certsigner.CertSigner - Signing certificate via Azure Key Vault HSM...
+14:23:45.850 [main] INFO  s.c.certsigner.CertSigner - Certificate signed successfully
+14:23:45.851 [main] INFO  s.c.certsigner.CertSigner - Encoding certificate to PEM format
+14:23:45.854 [main] INFO  s.c.c.CertSignerLauncher - Writing generated certificate (1482 bytes) to: /path/to/cert.pem
+14:23:45.856 [main] INFO  s.c.c.CertSignerLauncher - Certificate file written successfully: cert.pem
+14:23:45.856 [main] INFO  s.c.c.CertSignerLauncher - cert-signer completed successfully
+```
+
+> **Provenance Tags:**
+> - `[CSR]`: Sourced directly from the supplied PKCS#10 Certificate Signing Request.
+> - `[CLI]`: Explicitly supplied via command-line arguments.
+> - `[DEFAULT]`: Automatically calculated or defaulted (e.g., serial number generation, timestamp).
+> - `[KEY_VAULT]`: Determined dynamically from the Azure Key Vault HSM key metadata.
+
+
+---
+
 ## ⚙️ CLI Reference & Parameters
 
 | Option | Long Option | Parameter | Required | Default | Description |
