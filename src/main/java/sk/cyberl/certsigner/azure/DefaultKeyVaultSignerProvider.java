@@ -13,12 +13,16 @@ import com.azure.security.keyvault.keys.models.KeyVaultKey;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Default implementation of {@link KeyVaultSignerProvider} that connects to Azure Key Vault,
  * retrieves the HSM key metadata, and prepares an {@link AzureKeyVaultContentSigner}.
  */
 public class DefaultKeyVaultSignerProvider implements KeyVaultSignerProvider {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultKeyVaultSignerProvider.class);
 
     private final TokenCredential credential;
 
@@ -52,6 +56,7 @@ public class DefaultKeyVaultSignerProvider implements KeyVaultSignerProvider {
     @Override
     public ContentSigner createContentSigner(String kvName, String kvKeyName, String kvKeyVersion) {
         String vaultUrl = formatVaultUrl(kvName);
+        LOGGER.info("Connecting to Azure Key Vault: {}", vaultUrl);
 
         KeyClient keyClient = new KeyClientBuilder()
                 .vaultUrl(vaultUrl)
@@ -94,6 +99,9 @@ public class DefaultKeyVaultSignerProvider implements KeyVaultSignerProvider {
             signatureAlgorithm = SignatureAlgorithm.RS256;
             algorithmName = "SHA256withRSA";
         }
+
+        LOGGER.info("Retrieved Key Vault key '{}' (Type: {}, Signature Algorithm: {})",
+                kvKeyName, keyType, algorithmName);
 
         AlgorithmIdentifier algorithmIdentifier = new DefaultSignatureAlgorithmIdentifierFinder().find(algorithmName);
 

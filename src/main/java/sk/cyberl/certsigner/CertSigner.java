@@ -3,6 +3,7 @@ package sk.cyberl.certsigner;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -11,39 +12,35 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Objects;
 
-import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.ASN1Set;
 import org.bouncycastle.asn1.DLSet;
-import org.bouncycastle.asn1.pkcs.Attribute;
 import org.bouncycastle.asn1.pkcs.CertificationRequestInfo;
-import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.CertIOException;
+import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.security.auth.x500.X500Principal;
-
-import java.io.StringWriter;
-import java.util.Objects;
-
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
-import org.bouncycastle.operator.ContentSigner;
 
 import sk.cyberl.certsigner.azure.DefaultKeyVaultSignerProvider;
 import sk.cyberl.certsigner.azure.KeyVaultSignerProvider;
 import sk.cyberl.certsigner.config.CertSignerConfig;
+import sk.cyberl.certsigner.logging.AttributeSource;
+import sk.cyberl.certsigner.logging.CertificateAttributeLogger;
 
 /**
  * Certificate signer service that constructs X.509 v3 certificates and signs them
@@ -51,12 +48,15 @@ import sk.cyberl.certsigner.config.CertSignerConfig;
  * <p>
  * Supports input from either a PKCS#10 Certificate Signing Request (CSR) or direct
  * Subject DN, Public Key, and optional ASN.1 certificate attributes/extensions.
- * Outputs certificates in either PEM or DER encoding.
+ * Outputs certificates in either PEM or DER encoding and logs complete provenance.
  */
 public class CertSigner {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(CertSigner.class);
+
     private final CertSignerConfig config;
     private final KeyVaultSignerProvider signerProvider;
+    private CertificateAttributeLogger lastAttributeLogger;
 
     /**
      * Constructs a {@code CertSigner} with the given configuration and a {@link DefaultKeyVaultSignerProvider}.
@@ -88,62 +88,48 @@ public class CertSigner {
      * @throws RuntimeException         if reading CSR/keys, signing, or encoding the certificate fails.
      */
     public byte[] signCert() {
+        LOGGER.info("Initializing certificate construction and signing workflow");
+
+        CertificateAttributeLogger attrLogger = new CertificateAttributeLogger();
+        this.lastAttributeLogger = attrLogger;
+
         X500Name subjectDn;
-        ASN1Set attributes;
         SubjectPublicKeyInfo subjectPublicKeyInfo;
 
-        if (config.certCsrPath() != null && !config.certCsrPath().isBlank()) {
+        boolean hasCsr = config.certCsrPath() != null && !config.certCsrPath().isBlank();
+        boolean hasDirectSubject = config.certSubjectDn() != null && !config.certSubjectDn().isBlank();
+
+        if (hasCsr) {
+            LOGGER.info("Reading CSR from: {}", config.certCsrPath());
             CertificationRequestInfo csrInfo = parseCsr();
             subjectDn = csrInfo.getSubject();
-            attributes = csrInfo.getAttributes();
             subjectPublicKeyInfo = csrInfo.getSubjectPublicKeyInfo();
-        } else if (config.certSubjectDn() != null && !config.certSubjectDn().isBlank()) {
+
+            attrLogger.addAttribute("Subject DN", subjectDn.toString(), AttributeSource.CSR);
+            attrLogger.addPublicKey(subjectPublicKeyInfo, AttributeSource.CSR);
+            attrLogger.processAttributeSet(csrInfo.getAttributes(), AttributeSource.CSR);
+
+            // If CLI also provided --cert-attributes, layer them on top
+            if (config.certAttributes() != null && !config.certAttributes().isBlank()) {
+                LOGGER.info("Layering additional CLI attributes from: {}", config.certAttributes());
+                ASN1Set cliAttributes = parseAttributes();
+                attrLogger.processAttributeSet(cliAttributes, AttributeSource.CLI);
+            }
+        } else if (hasDirectSubject) {
+            LOGGER.info("Using direct Subject DN: {}", config.certSubjectDn());
             subjectDn = parseSubjectDn(config.certSubjectDn());
-            attributes = parseAttributes();
             subjectPublicKeyInfo = parsePublicKey();
+
+            attrLogger.addAttribute("Subject DN", subjectDn.toString(), AttributeSource.CLI);
+            attrLogger.addPublicKey(subjectPublicKeyInfo, AttributeSource.CLI);
+
+            ASN1Set cliAttributes = parseAttributes();
+            attrLogger.processAttributeSet(cliAttributes, AttributeSource.CLI);
         } else {
             throw new IllegalArgumentException("Either certCsrPath or certSubjectDn must be provided.");
         }
 
-        X509v3CertificateBuilder certBuilder = createCertificateBuilder(subjectDn, subjectPublicKeyInfo, attributes);
-
-        ContentSigner contentSigner = signerProvider.createContentSigner(
-                config.kvName(),
-                config.kvKeyName(),
-                config.kvKeyVersion()
-        );
-
-        X509CertificateHolder certHolder = certBuilder.build(contentSigner);
-
-        if (config.outputCertPath() != null && config.outputCertPath().toLowerCase().endsWith(".der")) {
-            try {
-                return certHolder.getEncoded();
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to encode certificate to DER format", e);
-            }
-        }
-
-        try (StringWriter sw = new StringWriter(); JcaPEMWriter pemWriter = new JcaPEMWriter(sw)) {
-            pemWriter.writeObject(certHolder);
-            pemWriter.flush();
-            return sw.toString().getBytes(StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to encode certificate to PEM format", e);
-        }
-    }
-
-    /**
-     * Creates and initializes an {@link X509v3CertificateBuilder} with subject, validity period, public key, and extensions.
-     *
-     * @param subjectDn            The subject Distinguished Name.
-     * @param subjectPublicKeyInfo The subject's public key info.
-     * @param attributes           Optional ASN.1 set containing certificate attributes/extensions.
-     * @return A configured {@link X509v3CertificateBuilder}.
-     */
-    private X509v3CertificateBuilder createCertificateBuilder(
-            X500Name subjectDn,
-            SubjectPublicKeyInfo subjectPublicKeyInfo,
-            ASN1Set attributes) {
+        // Validity and basic certificate fields
         X500Name issuer = subjectDn;
         BigInteger serialNumber = BigInteger.valueOf(System.currentTimeMillis());
         Instant now = Instant.now();
@@ -151,6 +137,27 @@ public class CertSigner {
         int validityDays = (config.validityDays() != null && config.validityDays() > 0) ? config.validityDays() : 365;
         Date notAfter = Date.from(now.plus(Duration.ofDays(validityDays)));
 
+        AttributeSource validitySource = config.validityDaysExplicit() ? AttributeSource.CLI : AttributeSource.DEFAULT;
+
+        attrLogger.addAttribute("Serial Number",
+                serialNumber + " (0x" + serialNumber.toString(16).toUpperCase() + ")",
+                AttributeSource.DEFAULT);
+        attrLogger.addAttribute("Issuer DN", issuer.toString(), AttributeSource.DEFAULT);
+        attrLogger.addValidity(notBefore, notAfter, validityDays, validitySource);
+
+        attrLogger.addAttribute("Signing Key",
+                String.format("Vault: '%s', Key: '%s', Version: '%s'",
+                        config.kvName(),
+                        config.kvKeyName(),
+                        config.kvKeyVersion() != null && !config.kvKeyVersion().isBlank() ? config.kvKeyVersion() : "latest"
+                ),
+                AttributeSource.CLI);
+
+        if (config.outputCertPath() != null) {
+            attrLogger.addAttribute("Output Path", config.outputCertPath(), AttributeSource.CLI);
+        }
+
+        // Create certificate builder and populate extensions
         X509v3CertificateBuilder certBuilder = new X509v3CertificateBuilder(
                 issuer,
                 serialNumber,
@@ -160,50 +167,100 @@ public class CertSigner {
                 subjectPublicKeyInfo
         );
 
-        addExtensions(certBuilder, attributes);
+        // Add all tracked extensions into the certificate builder
+        for (CertificateAttributeLogger.TrackedExtension ext : attrLogger.getExtensions().values()) {
+            try {
+                certBuilder.addExtension(ext.oid(), ext.critical(), getExtensionEncodedValue(ext));
+            } catch (CertIOException e) {
+                throw new RuntimeException("Failed to add extension to certificate builder: " + ext.oid().getId(), e);
+            }
+        }
 
-        return certBuilder;
+        LOGGER.info("Requesting remote ContentSigner from Key Vault: {} / {}", config.kvName(), config.kvKeyName());
+        ContentSigner contentSigner = signerProvider.createContentSigner(
+                config.kvName(),
+                config.kvKeyName(),
+                config.kvKeyVersion()
+        );
+
+        String signatureAlgName = contentSigner.getAlgorithmIdentifier().getAlgorithm().getId();
+        attrLogger.addAttribute("Signature Alg", signatureAlgName, AttributeSource.KEY_VAULT);
+
+        // Log the complete certificate provenance and extension report
+        attrLogger.logReport();
+
+        LOGGER.info("Signing certificate via Azure Key Vault HSM...");
+        X509CertificateHolder certHolder = certBuilder.build(contentSigner);
+        LOGGER.info("Certificate signed successfully");
+
+        if (config.outputCertPath() != null && config.outputCertPath().toLowerCase().endsWith(".der")) {
+            try {
+                LOGGER.info("Encoding certificate to binary DER format");
+                return certHolder.getEncoded();
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to encode certificate to DER format", e);
+            }
+        }
+
+        try (StringWriter sw = new StringWriter(); JcaPEMWriter pemWriter = new JcaPEMWriter(sw)) {
+            LOGGER.info("Encoding certificate to PEM format");
+            pemWriter.writeObject(certHolder);
+            pemWriter.flush();
+            return sw.toString().getBytes(StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to encode certificate to PEM format", e);
+        }
     }
 
     /**
-     * Extracts and adds extensions from the provided ASN.1 attributes set to the certificate builder.
-     *
-     * @param certBuilder The certificate builder to add extensions to.
-     * @param attributes  ASN.1 set containing extensions or extension requests.
-     * @throws RuntimeException if adding an extension to the certificate builder fails.
+     * Resolves the DER-encoded ASN.1 value for a tracked extension.
      */
-    private void addExtensions(X509v3CertificateBuilder certBuilder, ASN1Set attributes) {
-        if (attributes == null) {
-            return;
+    private byte[] getExtensionEncodedValue(CertificateAttributeLogger.TrackedExtension ext) {
+        // Find extension in parsed attributes / CSR to preserve exact byte structure
+        if (config.certAttributes() != null && !config.certAttributes().isBlank()) {
+            ASN1Set cliAttrs = parseAttributes();
+            byte[] encoded = extractExtensionValue(cliAttrs, ext.oid());
+            if (encoded != null) return encoded;
         }
 
-        for (ASN1Encodable encodable : attributes.toArray()) {
-            if (encodable instanceof Extension extension) {
-                try {
-                    certBuilder.addExtension(extension);
-                } catch (CertIOException e) {
-                    throw new RuntimeException("Failed to add extension to certificate builder", e);
-                }
-                continue;
+        if (config.certCsrPath() != null && !config.certCsrPath().isBlank()) {
+            CertificationRequestInfo csrInfo = parseCsr();
+            byte[] encoded = extractExtensionValue(csrInfo.getAttributes(), ext.oid());
+            if (encoded != null) return encoded;
+        }
+
+        return new byte[0];
+    }
+
+    /**
+     * Helper to extract the encoded octets of a specific extension OID from an ASN.1 attribute set.
+     */
+    private byte[] extractExtensionValue(ASN1Set attributes, org.bouncycastle.asn1.ASN1ObjectIdentifier targetOid) {
+        if (attributes == null) return null;
+
+        for (org.bouncycastle.asn1.ASN1Encodable encodable : attributes.toArray()) {
+            if (encodable instanceof Extension ext && ext.getExtnId().equals(targetOid)) {
+                return ext.getExtnValue().getOctets();
             }
 
             try {
-                Attribute attr = Attribute.getInstance(encodable);
-                if (PKCSObjectIdentifiers.pkcs_9_at_extensionRequest.equals(attr.getAttrType())) {
+                org.bouncycastle.asn1.pkcs.Attribute attr = org.bouncycastle.asn1.pkcs.Attribute.getInstance(encodable);
+                if (org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers.pkcs_9_at_extensionRequest.equals(attr.getAttrType())) {
                     ASN1Set attrValues = attr.getAttrValues();
                     if (attrValues != null && attrValues.size() > 0) {
-                        ASN1Encodable value = attrValues.getObjectAt(0);
-                        Extensions extensions = Extensions.getInstance(value);
-                        for (ASN1ObjectIdentifier oid : extensions.getExtensionOIDs()) {
-                            Extension ext = extensions.getExtension(oid);
-                            certBuilder.addExtension(ext);
+                        org.bouncycastle.asn1.x509.Extensions extensions =
+                                org.bouncycastle.asn1.x509.Extensions.getInstance(attrValues.getObjectAt(0));
+                        Extension ext = extensions.getExtension(targetOid);
+                        if (ext != null) {
+                            return ext.getExtnValue().getOctets();
                         }
                     }
                 }
-            } catch (Exception ignored) {
-                // Ignore attributes that cannot be parsed as extension requests
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to parse certificate attributes: " + config.certAttributes(), e);
             }
         }
+        return null;
     }
 
     /**
@@ -309,5 +366,15 @@ public class CertSigner {
         } catch (Exception e) {
             return new X500Name(dn);
         }
+    }
+
+    /**
+     * Returns the {@link CertificateAttributeLogger} from the most recent certificate signing operation.
+     * Useful for testing and inspection.
+     *
+     * @return Last attribute logger instance.
+     */
+    public CertificateAttributeLogger getLastAttributeLogger() {
+        return lastAttributeLogger;
     }
 }

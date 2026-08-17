@@ -38,6 +38,7 @@
         <bcpkix-jdk18on.version>1.85</bcpkix-jdk18on.version>
         <azure-security-keyvault-keys.version>4.11.1</azure-security-keyvault-keys.version>
         <azure-identity.version>1.18.4</azure-identity.version>
+        <logback.version>1.5.17</logback.version>
     </properties>
 
     <dependencies>
@@ -74,6 +75,12 @@
             <groupId>com.azure</groupId>
             <version>${azure-identity.version}</version>
             <artifactId>azure-identity</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>

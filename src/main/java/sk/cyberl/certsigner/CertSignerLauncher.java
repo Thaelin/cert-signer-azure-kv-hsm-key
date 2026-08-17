@@ -2,7 +2,9 @@ package sk.cyberl.certsigner;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 import sk.cyberl.certsigner.config.CertSignerConfig;
 
 import java.nio.file.Files;
@@ -11,6 +13,8 @@ import java.security.Security;
 import java.util.concurrent.Callable;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Command-line interface launcher for signing certificates using Azure Key Vault HSM keys.
@@ -23,6 +27,11 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
     usageHelpAutoWidth = true
 )
 public class CertSignerLauncher implements Callable<Integer> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CertSignerLauncher.class);
+
+    @Spec
+    private CommandSpec spec;
 
     @Option(
         names = {"-o", "--output-cert-path"},
@@ -110,7 +119,10 @@ public class CertSignerLauncher implements Callable<Integer> {
      */
     @Override
     public Integer call() throws Exception {
+        LOGGER.info("Starting cert-signer execution");
         validateInputs();
+
+        boolean validityDaysExplicit = isValidityDaysExplicit();
 
         var certSigner = new CertSigner(
             new CertSignerConfig(
@@ -122,17 +134,40 @@ public class CertSignerLauncher implements Callable<Integer> {
                 validityDays,
                 kvName, 
                 kvKeyName, 
-                kvKeyVersion
+                kvKeyVersion,
+                validityDaysExplicit
             )
         );
 
         byte[] signedCert = certSigner.signCert();
 
         if (signedCert != null) {
-            Files.write(Path.of(outputCertPath), signedCert);
+            Path outPath = Path.of(outputCertPath);
+            LOGGER.info("Writing generated certificate ({} bytes) to: {}", signedCert.length, outPath.toAbsolutePath());
+            if (outPath.getParent() != null) {
+                Files.createDirectories(outPath.getParent());
+            }
+            Files.write(outPath, signedCert);
+            LOGGER.info("Certificate file written successfully: {}", outputCertPath);
         }
 
+        LOGGER.info("cert-signer completed successfully");
         return CommandLine.ExitCode.OK;
+    }
+
+    /**
+     * Determines whether the {@code --validity-days} option was explicitly set on the CLI.
+     *
+     * @return {@code true} if explicitly specified; {@code false} if default.
+     */
+    private boolean isValidityDaysExplicit() {
+        if (spec != null && spec.commandLine() != null && spec.commandLine().getParseResult() != null) {
+            var parseResult = spec.commandLine().getParseResult();
+            return parseResult.hasMatchedOption("validity-days")
+                    || parseResult.hasMatchedOption("validity-period")
+                    || parseResult.hasMatchedOption("d");
+        }
+        return false;
     }
 
     /**

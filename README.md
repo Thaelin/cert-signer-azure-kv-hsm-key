@@ -20,6 +20,7 @@ Standard OpenSSL APIs and traditional cryptographic tooling require local access
   - **Direct Mode**: Sign certificates using Subject Distinguished Name (DN) and a standalone public key file.
 - **Multiple Encodings**: Supports input and output in both **PEM** and binary **DER** formats. Output format is automatically determined based on the file extension (`.der` produces DER; other extensions produce PEM).
 - **Custom Attributes & Extensions**: Support for ASN.1 DER certificate attributes and extension requests (via file or Base64 string).
+- **Provenance & Extension Logging**: Automatically logs every certificate attribute and decoded X.509 extension (e.g. Basic Constraints, Key Usage, SAN, AKI/SKI, AIA, Policies) with explicit origin tracking (`[CSR]`, `[CLI]`, `[DEFAULT]`, `[KEY_VAULT]`).
 - **Configurable Validity**: Customize validity duration in days (default: 365).
 - **Seamless Authentication**: Integrates with `DefaultAzureCredential` (Azure CLI, Managed Identity, Service Principals, etc.).
 
