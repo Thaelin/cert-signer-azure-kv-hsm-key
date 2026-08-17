@@ -1,6 +1,10 @@
 # cert-signer-azure-kv-hsm-key
 
-Program that can be used to create digital certificate based on CSR (or without) using Azure Key Vault premium HSM keys (non-exportable). Standard OpenSSL APIs expect signing key to be present in the environment but in case of HSM keys they are by nature non-exportable so dedicated cloud vendors key signing API needs to be used.
+A CLI tool to create and sign X.509 v3 digital certificates using non-exportable Azure Key Vault HSM keys (RSA or ECDSA) based on a CSR or a standalone public key.
+
+Standard OpenSSL APIs and traditional cryptographic tooling require local access to the private key. Because Azure Key Vault HSM keys are non-exportable by design, this tool delegates certificate signing directly to Azure Key Vault's cryptographic signing API.
+
+---
 
 ## Features
 
@@ -10,45 +14,38 @@ Program that can be used to create digital certificate based on CSR (or without)
   - **Direct Mode**: Sign certificates using Subject Distinguished Name (DN) and a standalone public key file.
 - **Multiple Encodings**: Supports input and output in both **PEM** and binary **DER** formats. Output format is automatically determined based on the file extension (`.der` produces DER; other extensions produce PEM).
 - **Custom Attributes & Extensions**: Support for ASN.1 DER certificate attributes and extension requests (via file or Base64 string).
-- **Configurable Validity**: Customize validity duration in days.
+- **Configurable Validity**: Customize validity duration in days (default: 365).
+- **Seamless Authentication**: Integrates with `DefaultAzureCredential` (Azure CLI, Managed Identity, Service Principals, etc.).
 
 ---
 
-## Prerequisites
+## 🚀 User Guide (Quick Start)
 
-- **Java**: Java 25 or higher
-- **Maven**: Maven 3.8+ (for building)
-- **Azure Authentication**: Azure credentials configured for [DefaultAzureCredential](https://learn.microsoft.com/en-us/java/api/com.azure.identity.defaultazurecredential) (e.g. `az login`, environment variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`, or Managed Identity) with permissions to sign using Azure Key Vault (`Key Vault Crypto User` or `sign` key permission).
+> **Note:** You do **not** need Maven, Git, or any build tools to use this application. Simply download the prebuilt JAR from Releases.
 
----
+### 1. Prerequisites (for Users)
+- **Java**: Java 25 or higher (JRE or JDK, e.g. [Eclipse Temurin](https://adoptium.net/)).
+- **Azure Permissions**: Azure credentials configured with permissions to sign using Azure Key Vault (`Key Vault Crypto User` role or `sign` key permission).
+  - *Easiest setup:* Run `az login` via the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli).
 
-## Build
+### 2. Download Prebuilt JAR
+Download the latest executable JAR (`cert-signer-azure-kv-hsm-key.jar`) from the **[GitHub Releases](https://github.com/Thaelin/cert-signer-azure-kv-hsm-key/releases/latest)** page.
 
-Build the runnable shaded JAR using Maven:
+### 3. Run
+Run the downloaded JAR directly:
 
 ```bash
-mvn clean package
+java -jar cert-signer-azure-kv-hsm-key.jar [OPTIONS]
 ```
 
-The resulting executable JAR will be generated in the `target/` directory:
-`target/cert-signer-azure-kv-hsm-key.jar`
-
 ---
 
-## Usage
+## 📖 Usage Examples
 
-Run the JAR using the `java -jar` command:
-
-```bash
-java -jar target/cert-signer-azure-kv-hsm-key.jar [OPTIONS]
-```
-
-### Examples
-
-#### 1. Sign using a CSR (PEM output)
+### 1. Sign using a CSR (PEM output)
 
 ```bash
-java -jar target/cert-signer-azure-kv-hsm-key.jar \
+java -jar cert-signer-azure-kv-hsm-key.jar \
   --output-cert-path cert.pem \
   --cert-csr-path request.csr \
   --validity-days 365 \
@@ -57,10 +54,10 @@ java -jar target/cert-signer-azure-kv-hsm-key.jar \
   --kv-key-version 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
 ```
 
-#### 2. Sign using Subject DN and Public Key (DER output)
+### 2. Sign using Subject DN and Public Key (DER output)
 
 ```bash
-java -jar target/cert-signer-azure-kv-hsm-key.jar \
+java -jar cert-signer-azure-kv-hsm-key.jar \
   -o cert.der \
   -s "CN=example.com,O=My Org,C=US" \
   -p public_key.pem \
@@ -70,10 +67,10 @@ java -jar target/cert-signer-azure-kv-hsm-key.jar \
   -e 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
 ```
 
-#### 3. Sign with ASN.1 DER Attributes / Extensions
+### 3. Sign with ASN.1 DER Attributes / Extensions
 
 ```bash
-java -jar target/cert-signer-azure-kv-hsm-key.jar \
+java -jar cert-signer-azure-kv-hsm-key.jar \
   --output-cert-path cert.pem \
   --cert-subject-dn "CN=example.com,O=My Org,C=US" \
   --cert-public-key-path public_key.pem \
@@ -85,40 +82,74 @@ java -jar target/cert-signer-azure-kv-hsm-key.jar \
 
 ---
 
-## Parameters
+## ⚙️ CLI Reference & Parameters
 
 | Option | Long Option | Parameter | Required | Default | Description |
 | :--- | :--- | :--- | :---: | :---: | :--- |
 | `-o` | `--output-cert-path` | `<path>` | **Yes** | — | Path to write the output certificate file. Uses DER encoding if filename ends with `.der`, otherwise PEM encoding. |
-| `-r` | `--cert-csr-path` | `<path>` | **Conditional** | — | Path to the PKCS#10 Certificate Signing Request (CSR) file (PEM or DER format). Required if `-s` is not specified. |
+| `-r` | `--cert-csr-path` | `<path>` | **Conditional** | — | Path to PKCS#10 Certificate Signing Request (CSR) file (PEM or DER format). Required if `-s` is not specified. |
 | `-s` | `--cert-subject-dn` | `<dn>` | **Conditional** | — | Certificate Subject Distinguished Name (e.g. `'CN=example.com,O=Org,C=US'`). Required if `-r` is not specified. |
-| `-p` | `--cert-public-key-path` | `<path>` | **Conditional** | — | Path to the subject's public key file (PEM or DER format). Required when `-s` is specified. |
+| `-p` | `--cert-public-key-path` | `<path>` | **Conditional** | — | Path to subject public key file (PEM or DER format). Required when `-s` is specified. |
 | `-a` | `--cert-attributes` | `<attributes>` | No | — | Path to an ASN.1 DER attributes file or a Base64-encoded ASN.1 string containing certificate attributes/extensions. |
 | `-d` | `--validity-days`, `--validity-period` | `<days>` | No | `365` | Certificate validity period in days. |
 | `-v` | `--kv-name` | `<name>` | **Yes** | — | Azure Key Vault name or full vault URL (e.g. `my-vault` or `https://my-vault.vault.azure.net`). |
 | `-k` | `--kv-key-name` | `<name>` | **Yes** | — | Name of the signing key in Azure Key Vault. |
 | `-e` | `--kv-key-version` | `<version>` | **Yes** | — | Key version identifier in Azure Key Vault. |
-| `-h` | `--help` | — | No | — | Display the help message and exit. |
+| `-h` | `--help` | — | No | — | Display help message and exit. |
 | `-V` | `--version` | — | No | — | Display version information and exit. |
 
-> **Note on Input Modes:**
-> You must provide either:
-> 1. `--cert-csr-path` (`-r`) for CSR-based certificate creation, OR
-> 2. Both `--cert-subject-dn` (`-s`) and `--cert-public-key-path` (`-p`) for direct certificate creation.
+> **Input Modes:**
+> - **CSR Mode:** Supply `--cert-csr-path` (`-r`).
+> - **Direct Mode:** Supply both `--cert-subject-dn` (`-s`) and `--cert-public-key-path` (`-p`).
 
 ---
 
-## Authentication
+## 🔐 Azure Authentication
 
-Authentication to Azure Key Vault is handled transparently via Azure Identity (`DefaultAzureCredential`). It attempts authentication in the following order:
+Authentication to Azure Key Vault is handled automatically via Azure Identity (`DefaultAzureCredential`). It checks for credentials in the following order:
 
-1. **Environment Variables**:
+1. **Azure CLI**: Run `az login` prior to executing the tool (recommended for local user workflows).
+2. **Environment Variables**: Set credentials (recommended for automated/CI environments):
    - `AZURE_CLIENT_ID`
    - `AZURE_CLIENT_SECRET`
    - `AZURE_TENANT_ID`
-2. **Workload Identity / Managed Identity**: Enabled on Azure VMs, App Services, or Azure Kubernetes Service (AKS).
-3. **Azure CLI**: Run `az login` prior to executing the tool.
-4. **Azure Developer CLI / IDE Credentials**: Authenticated sessions via Azure CLI or Azure Developer CLI (`azd`).
+3. **Managed Identity / Workload Identity**: Automatically used when running on Azure VMs, App Services, Container Apps, or Azure Kubernetes Service (AKS).
+4. **Developer Tools**: Credentials from Azure Developer CLI (`azd`) or IDE sessions.
+
+---
+
+## 🛠️ Developer Guide (Building from Source)
+
+If you are a developer looking to build, customize, or contribute to the codebase:
+
+### Prerequisites (Developers)
+- **Java JDK**: Java Development Kit 25 or higher
+- **Maven**: Apache Maven 3.8+
+- **Git**
+
+### Building the Project
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Thaelin/cert-signer-azure-kv-hsm-key.git
+   cd cert-signer-azure-kv-hsm-key
+   ```
+
+2. **Build the shaded JAR:**
+   ```bash
+   mvn clean package
+   ```
+
+3. The executable shaded JAR will be generated in the `target/` folder:
+   ```bash
+   target/cert-signer-azure-kv-hsm-key.jar
+   ```
+
+### Running Tests
+Execute unit and integration test suites:
+```bash
+mvn test
+```
 
 ---
 
