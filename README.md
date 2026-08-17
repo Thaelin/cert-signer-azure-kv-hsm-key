@@ -1,5 +1,11 @@
 # cert-signer-azure-kv-hsm-key
 
+[![GitHub Release](https://img.shields.io/github/v/release/Thaelin/cert-signer-azure-kv-hsm-key?style=flat-square&logo=github&color=0078D4)](https://github.com/Thaelin/cert-signer-azure-kv-hsm-key/releases/latest)
+[![Release Status](https://img.shields.io/github/actions/workflow/status/Thaelin/cert-signer-azure-kv-hsm-key/release.yml?style=flat-square&logo=githubactions&logoColor=white&label=Release)](https://github.com/Thaelin/cert-signer-azure-kv-hsm-key/actions/workflows/release.yml)
+[![Java 25+](https://img.shields.io/badge/Java-25+-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](https://adoptium.net/)
+[![Azure Key Vault](https://img.shields.io/badge/Azure_Key_Vault-HSM_Signing-0078D4?style=flat-square&logo=microsoftazure&logoColor=white)](https://azure.microsoft.com/en-us/products/key-vault/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-2ea44f?style=flat-square&logo=apache)](LICENSE)
+
 A CLI tool to create and sign X.509 v3 digital certificates using non-exportable Azure Key Vault HSM keys (RSA or ECDSA) based on a CSR or a standalone public key.
 
 Standard OpenSSL APIs and traditional cryptographic tooling require local access to the private key. Because Azure Key Vault HSM keys are non-exportable by design, this tool delegates certificate signing directly to Azure Key Vault's cryptographic signing API.
