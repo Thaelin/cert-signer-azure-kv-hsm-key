@@ -1,0 +1,23 @@
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{25}) - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Suppress verbose third-party logs -->
+    <logger name="com.azure" level="WARN"/>
+    <logger name="com.azure.core" level="WARN"/>
+    <logger name="com.azure.identity" level="WARN"/>
+    <logger name="com.azure.security.keyvault" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="reactor.netty" level="WARN"/>
+    <logger name="org.apache.http" level="WARN"/>
+
+    <!-- Application logger -->
+    <logger name="sk.cyberl.certsigner" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
