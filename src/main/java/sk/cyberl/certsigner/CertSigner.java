@@ -28,18 +28,35 @@ import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
-import org.bouncycastle.jce.PKCS10CertificationRequest;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
+import javax.security.auth.x500.X500Principal;
+
+import java.io.StringWriter;
+import java.util.Objects;
+
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.bouncycastle.operator.ContentSigner;
+
+import sk.cyberl.certsigner.azure.DefaultKeyVaultSignerProvider;
+import sk.cyberl.certsigner.azure.KeyVaultSignerProvider;
 import sk.cyberl.certsigner.config.CertSignerConfig;
 
 public class CertSigner {
 
     private final CertSignerConfig config;
+    private final KeyVaultSignerProvider signerProvider;
 
     public CertSigner(CertSignerConfig config) {
-        this.config = config;
+        this(config, new DefaultKeyVaultSignerProvider());
+    }
+
+    public CertSigner(CertSignerConfig config, KeyVaultSignerProvider signerProvider) {
+        this.config = Objects.requireNonNull(config, "config must not be null");
+        this.signerProvider = Objects.requireNonNull(signerProvider, "signerProvider must not be null");
     }
 
     public byte[] signCert() {
@@ -53,7 +70,7 @@ public class CertSigner {
             attributes = csrInfo.getAttributes();
             subjectPublicKeyInfo = csrInfo.getSubjectPublicKeyInfo();
         } else if (config.certSubjectDn() != null && !config.certSubjectDn().isBlank()) {
-            subjectDn = new X500Name(config.certSubjectDn());
+            subjectDn = parseSubjectDn(config.certSubjectDn());
             attributes = parseAttributes();
             subjectPublicKeyInfo = parsePublicKey();
         } else {
@@ -62,9 +79,29 @@ public class CertSigner {
 
         X509v3CertificateBuilder certBuilder = createCertificateBuilder(subjectDn, subjectPublicKeyInfo, attributes);
 
-        // TODO: Sign certificate using Azure Key Vault HSM key
+        ContentSigner contentSigner = signerProvider.createContentSigner(
+                config.kvName(),
+                config.kvKeyName(),
+                config.kvKeyVersion()
+        );
 
-        return null;
+        X509CertificateHolder certHolder = certBuilder.build(contentSigner);
+
+        if (config.outputCertPath() != null && config.outputCertPath().toLowerCase().endsWith(".der")) {
+            try {
+                return certHolder.getEncoded();
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to encode certificate to DER format", e);
+            }
+        }
+
+        try (StringWriter sw = new StringWriter(); JcaPEMWriter pemWriter = new JcaPEMWriter(sw)) {
+            pemWriter.writeObject(certHolder);
+            pemWriter.flush();
+            return sw.toString().getBytes(StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to encode certificate to PEM format", e);
+        }
     }
 
     private X509v3CertificateBuilder createCertificateBuilder(
@@ -129,8 +166,17 @@ public class CertSigner {
     private CertificationRequestInfo parseCsr() {
         try {
             byte[] csrBytes = Files.readAllBytes(Path.of(config.certCsrPath()));
+            String content = new String(csrBytes, StandardCharsets.UTF_8);
+            if (content.contains("-----BEGIN")) {
+                try (PemReader reader = new PemReader(new StringReader(content))) {
+                    PemObject pemObject = reader.readPemObject();
+                    if (pemObject != null) {
+                        csrBytes = pemObject.getContent();
+                    }
+                }
+            }
             PKCS10CertificationRequest csr = new PKCS10CertificationRequest(csrBytes);
-            return csr.getCertificationRequestInfo();
+            return csr.toASN1Structure().getCertificationRequestInfo();
         } catch (IOException e) {
             throw new RuntimeException("Failed to read CSR file: " + config.certCsrPath(), e);
         } catch (Exception e) {
@@ -187,6 +233,14 @@ public class CertSigner {
             return SubjectPublicKeyInfo.getInstance(keyBytes);
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse public key file: " + config.certPublicKeyPath(), e);
+        }
+    }
+
+    private X500Name parseSubjectDn(String dn) {
+        try {
+            return X500Name.getInstance(new X500Principal(dn).getEncoded());
+        } catch (Exception e) {
+            return new X500Name(dn);
         }
     }
 }

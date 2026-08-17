@@ -28,6 +28,8 @@
         <picocli.version>4.7.6</picocli.version>
         <bcprov-jdk18on.version>1.85.2</bcprov-jdk18on.version>
         <bcpkix-jdk18on.version>1.85</bcpkix-jdk18on.version>
+        <azure-security-keyvault-keys.version>4.11.1</azure-security-keyvault-keys.version>
+        <azure-identity.version>1.18.4</azure-identity.version>
     </properties>
 
     <dependencies>
@@ -52,6 +54,18 @@
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk18on</artifactId>
             <version>${bcpkix-jdk18on.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <version>${azure-security-keyvault-keys.version}</version>
+            <artifactId>azure-security-keyvault-keys</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <version>${azure-identity.version}</version>
+            <artifactId>azure-identity</artifactId>
             <scope>compile</scope>
         </dependency>
     </dependencies>
