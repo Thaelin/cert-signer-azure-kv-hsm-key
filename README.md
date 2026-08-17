@@ -1,4 +1,4 @@
-# cert-signer-azure-kv-hsm-key
+# Certificate signer using Azure Key Vault (premium tier) HSM key
 
 [![GitHub Release](https://img.shields.io/github/v/release/Thaelin/cert-signer-azure-kv-hsm-key?style=flat-square&logo=github&color=0078D4)](https://github.com/Thaelin/cert-signer-azure-kv-hsm-key/releases/latest)
 [![Release Status](https://img.shields.io/github/actions/workflow/status/Thaelin/cert-signer-azure-kv-hsm-key/release.yml?style=flat-square&logo=githubactions&logoColor=white&label=Release)](https://github.com/Thaelin/cert-signer-azure-kv-hsm-key/actions/workflows/release.yml)
