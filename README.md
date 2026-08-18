@@ -65,13 +65,13 @@ java -jar cert-signer-azure-kv-hsm-key.jar \
 
 ```bash
 java -jar cert-signer-azure-kv-hsm-key.jar \
-  -o cert.der \
-  -s "CN=example.com,O=My Org,C=US" \
-  -p public_key.pem \
-  -d 730 \
-  -v my-keyvault \
-  -k my-ca-key \
-  -e 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
+  --output-cert-path cert.der \
+  --cert-subject-dn "CN=example.com,O=My Org,C=US" \
+  --cert-public-key-path public_key.pem \
+  --validity-days 730 \
+  --kv-name my-keyvault \
+  --kv-key-name my-ca-key \
+  --kv-key-version 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
 ```
 
 ### 3. Sign with ASN.1 DER Attributes / Extensions
@@ -95,12 +95,12 @@ Below is an example of what executing `cert-signer` looks like in the terminal, 
 
 ```bash
 $ java -jar cert-signer-azure-kv-hsm-key.jar \
-    -o cert.pem \
-    -r request.csr \
-    -d 365 \
-    -v my-keyvault \
-    -k my-ca-key \
-    -e 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
+    --output-cert-path cert.pem \
+    --cert-csr-path request.csr \
+    --validity-days 365 \
+    --kv-name my-keyvault \
+    --kv-key-name my-ca-key \
+    --kv-key-version 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
 ```
 
 **Console Output:**
